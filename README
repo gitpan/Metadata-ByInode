@@ -1,0 +1,12 @@
+Metadata::ByInode
+=================
+
+Installing:
+
+If you extracted files to /tmp/Metadata-ByInode
+cd /tmp/Metadata-ByInode
+perl Makefile.PL
+make test;
+make install;
+
+
