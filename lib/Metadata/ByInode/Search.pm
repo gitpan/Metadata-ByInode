@@ -2,7 +2,7 @@ package Metadata::ByInode::Search;
 use strict;
 use warnings;
 #use Smart::Comments '###';
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.6 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.8 $ =~ /(\d+)/g;
 
 
 #returns boolean, did a search complete?
@@ -55,24 +55,37 @@ sub search { # multiple key lookup and ranked
 	my $argcount = keys %{$arg};
 	### $argcount
 
-	my $sth = $self->dbh->prepare(
-			"SELECT * FROM metadata WHERE key=? and value LIKE ?");
-
+	my $select= {
+	 'like'  => $self->dbh->prepare("SELECT * FROM metadata WHERE key=? and value LIKE ?"),
+	 'exact' => $self->dbh->prepare("SELECT * FROM metadata WHERE key=? and value=?"),
+	};	
+	my $sk = 'like';
 
 	my $RESULT = {};
 
 	for ( keys %{$arg} ){
-		my $key = $_; my $value = "%".$arg->{$_}."%";
-		$sth->execute($key,$value);
-
-		while ( my $row = $sth->fetch ){
-			$RESULT->{$row->[0]}->{_hit}++;
+		my ($key,$value)= ($_,undef); 
+		
+		if ($key=~s/:exact$//){ # EXACT, so they can override the like
+			$value = $arg->{$_};
+			$sk= 'exact';
+		}
+		else { # LIKE		
+			$key=~s/:like$//; # just in case
+			$value = "%".$arg->{$_}."%";
+			$sk ='like'			
 		}
 		
+		$select->{$sk}->execute($key,$value);
+
+		while ( my $row = $select->{$sk}->fetch ){
+			$RESULT->{$row->[0]}->{_hit}++;
+		}		
 		
 	}
 
 	# just leave the result whose count matches num of args?
+	# instead should order them to the back.. ?
 	my $count = 0;
 	for (keys %{$RESULT}){
 		
@@ -88,6 +101,9 @@ sub search { # multiple key lookup and ranked
 	$self->{_search}->{data}  = $RESULT;
 	return $RESULT;
 }
+
+
+
 
 
 
@@ -119,11 +135,31 @@ Imagine you want to search for all metadata for a file whose absolute path you k
 	my $RESULT = $mbi->search ({
 		filename => 'pm',
 		abs_loc => '/home/leo/devel/Metadata-ByInode/lib'
-	});
+	},);
+	
 	
 Returns hash of hashes. Key is inode.
 
-search() is NOT an exact match. it is a LIKE function.
+search() is NOT an exact match. it is a LIKE function by default.
+If you want some keys to be exact then you must defined the key as:
+
+	my $RESULT = $mbi->search ({
+		filename => 'pm',
+		'abs_loc:exact' => '/home/leo/devel/Metadata-ByInode/lib'
+	},);
+
+This would make the abs_loc be exactly '/home/leo/devel/Metadata-ByInode/lib', 
+and the filename would match '*pm*'.
+
+Notice that this is the same thing:
+
+	my $RESULT = $mbi->search ({
+		'filename:like' => 'pm',
+		'abs_loc:exact' => '/home/leo/devel/Metadata-ByInode/lib'
+	},);
+
+	
+
 
 example output:
 
@@ -171,12 +207,12 @@ Returns undef if no search was run.
 
 =head1 SEE ALSO
 
-Metadata::ByInode, Metadata::ByInode::Indexer
+L<Metadata::ByInode> and L<Metadata::ByInode::Indexer>
 
 
 =head1 AUTHOR
 
-Leo Charre
+Leo Charre <leo@leocharre.com>
 
 =cut
 

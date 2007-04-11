@@ -9,7 +9,7 @@ use Metadata::ByInode::Indexer;
 our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
 
 #use Smart::Comments '####', '#####';
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.9 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.11 $ =~ /(\d+)/g;
 
 sub new {
 	my ($class,$self)= (shift,shift);
@@ -28,14 +28,22 @@ sub new {
 
 Metadata::ByInode - Extend metadata in relation to file's inode using a database.
 
-=cut
 
 =head1 SYNOPSIS
 
 	use Metadata::ByInode;
+	
+	my $mbi = new Metadata::ByInode({ abs_dbfile => '/home/myself/mbi.db' });
+	
+	# index files for quick lookup
+	$mbi->index('/home/myself/photos/family');
 
-	my $mbi = new Metadata::ByInode({ abs_dbfile => '/tmp/temporary.db' });
-
+	# lookup a file by filename and location
+	my $results = 
+		$mbi->search({ 
+			abs_loc => '/home/myself/photos/family', 
+			filename => 'ralph' 
+		});
 
 =head1 DESCRIPTION
 
@@ -48,7 +56,7 @@ The indexer is a module that inherits this one.
 
 =head1 SEE ALSO
 
-Metadata:::ByInode::Indexer;
+L<Metadata::ByInode::Indexer>
 
 =head1 METHODS 
 
@@ -75,9 +83,6 @@ Example usage:
 	my $mbi = new Metadata::ByInode({
 		abs_dbfile => '/home/myself/mystuff.db'		
 	});
-
-
-
 
 
 =head1 NOTE ON dbh
@@ -123,6 +128,8 @@ PRIMARY KEY (inode,key)
 
 	return 1;
 }
+=pod
+
 =head1 _setup_db()
 
 automatically called if using sqlite on a non existent file, and we just created it.
@@ -145,6 +152,7 @@ The table is :
 
 sub dbh {
 	my $self = shift;	
+
 	
 	unless( defined $self->{dbh} ){
 		
@@ -175,19 +183,12 @@ sub dbh {
 	}	
 	return $self->{dbh};
 }
+=pod
+
 =head1 dbh()
 
 Returns open db handle. If you did not pass an open database handle to the constructor, it expects that you did pass an absolute path to where
 you want an sqlite database file read. If it does not exist, it will be made and setup.
-
-=cut
-
-
-
-
-
-
-
 
 =head1 GET AND SET METHODS
 
@@ -230,6 +231,8 @@ sub set {
 
 	return 1;
 }
+=pod
+
 =head2 set()
 
 Sets meta for a file. First argument is abs_path or inode. Second argument is hash ref.
@@ -269,6 +272,8 @@ sub get {
 	return $value;	
 
 }
+=pod
+
 =head2 get()
 
 First argument is inode number, or absolute path to file.
@@ -309,7 +314,9 @@ sub get_all {
 	
 	return $meta;
 }
-=head1 get_all()
+=pod
+
+=head2 get_all()
 
 Returns hash with all metadata for one file.
 First argument is abs_path or inode.
@@ -322,8 +329,6 @@ Please note: get() methods do NOT check for file existence, they just query the 
 information.
 
 =cut
-
-
 # TODO: REFINE THIS
 =head2 NOTE ABOUT get() AND set()
 
@@ -337,15 +342,6 @@ file existence.
 You cannot set() metadata for files that are not on disk
 
 You *can* query for metadata for files that are NOT on disk.
-
-=cut
-
-
-
-
-
-
-
 
 =head1 INTERNAL METHODS
 
@@ -389,6 +385,8 @@ SELECT inode FROM metadata WHERE key='abs_loc' AND value=? and inode=
 	#### $inode
 	return $inode;	
 }
+=pod
+
 =head1 _search_inode()
 
 To get the inode from database.
@@ -417,6 +415,8 @@ sub _get_inode {
 	
 	return $arg;
 }
+=pod
+
 =head1 _get_inode()
 
 To get the inode from disk.
@@ -425,15 +425,6 @@ Takes argument and tries to return inode. Argument can be absolute file path.
 If argument is an inode, returns same value.
 If argument is word chars, tries to stat for inode.
 Returns undef if absolute path not on disk.
-
-=cut
-
-
-
-
-
-
-
 
 =head1 DESTROY() METHODS
 
@@ -459,6 +450,8 @@ sub _finish_open_handles {
 		}	
 	 }
 
+
+
 	return $self->{_commit};
 }
 
@@ -475,63 +468,22 @@ sub DESTROY {
 			$self->dbh->commit;
 				
 		}
+		
+		 # get rid of annoying waring
+		open (STDERR,">>/dev/null");
+
 		$self->dbh->disconnect; # TODO : warns that 'closing dbh with active statement handles at lib/Metadata/ByInode.pm'
 		# WHY does it warn???
+		close STDERR;
 	}
 }
 1;
-__END__
-
 
 =pod
 
-=head1 NAME
-
-Metadata::ByInode - set and get metadata
-
-=head1 SYNOPSIS
-
-	use Metadata::ByInode;
-
-	my $mbi = new Metadata::ByInode({
-		abs_dbfile => '/path/to/where/you/want/your_dbfile.db',
-	});
-
-=head1 DESCRIPTION
+=head1 CAVEATS
 
 All paths are resolved for symlinks, NOTE!
-
-
-
-
-=head1 EXAMPLE USAGE
-
-
-	#!/usr/bin/perl -w
-	use Metadata::ByInode;
-	
-	my $mbi = new Metadata::ByInode({ abs_dbfile => '/home/myself/mbi.db' });
-
-	
-	# index files for quick lookup, this records inode, absolute location, and filename
-	$mbi->index('/home/myself/photos/family');
-
-	# lookup a file by filename and location
-	my $results = 
-		$mbi->search({ 
-			abs_loc => '/home/myself/photos/family/2002', 
-			filename => 'ralph' 
-		});
-
-	
-
-
-
-
-
-
-This is meant to run on the whole repo every time
-so it doesnt fucking matter that these be rel paths.
 
 =head1 PROS AND CONS
 
@@ -549,9 +501,12 @@ If you are indexing large ammounts of data, you can backup, and if you restore v
 
 If you move the file to another filesystem (to another disk, to another partition) the inode of the file changes.
 
+=head1 BUGS
 
+Please contact AUTHOR.
 
+=head1 AUTHOR
 
-
+Leo Charre <leo@leocharre.com>
 
 =cut

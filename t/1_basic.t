@@ -1,4 +1,4 @@
-use Test::Simple tests=>13;
+use Test::Simple 'no_plan';
 use strict;
 use lib './lib';
 use Metadata::ByInode;

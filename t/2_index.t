@@ -18,9 +18,11 @@ ok( $m->index(cwd), 'index cwd');
 ### search tests...
 
 my $RESULT;
+ok( $RESULT = $m->search({'filename:exact' => 'file2.x', abs_loc=> cwd().'/t' }),'search exact one key');
+ok( $m->results_count == 1 );
 
 
-ok( $RESULT = $m->search({filename => 'pm', abs_loc=> cwd().'/lib' }),'search one key');
+ok( $RESULT = $m->search({'filename:like' => 'pm', abs_loc=> cwd().'/lib' }),'search one key');
 ### $RESULT
 
 my $count = $m->results_count;

@@ -5,13 +5,13 @@ use Carp;
 use Cwd;
 #use Smart::Comments '###';
 
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.1 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.3 $ =~ /(\d+)/g;
 
 =pod
 
 =head1 NAME
 
-Metadata::ByInode::Indexer
+Metadata::ByInode::Indexer - customizable file and directory indexer
 
 =head1 DESCRIPTION 
 
@@ -32,7 +32,11 @@ returns indexed files count
 by default the indexer does not index hidden files
 to index hidden files,
 
- $m = new Metadata::ByInode::Indexer({ abs_dbfile => '/tmp/mbi_test.db', index_hidden_files => 1 });
+ $m = new Metadata::ByInode::Indexer({ 
+   abs_dbfile => '/tmp/mbi_test.db', 
+   index_hidden_files => 1 
+ });
+ 
  $m->index('/path/to/what'); # dir or file
  		
 
@@ -120,7 +124,8 @@ sub _reset {
 
 sub _set {
 	my $self = shift;	
-	my ($key,$val)=(shift,shift); $key and $val or die($!);
+	my ($key,$val)=(shift,shift); (defined $key and defined $val) 
+		or croak("_set() missing [key:$key] or [val:$val]");
 	$self->{_current_record}->{$key} = $val;
 	return 1;
 }
@@ -139,6 +144,8 @@ sub index_extra {
 	my $self = shift;	
 	return 1;
 }
+=pod
+
 =head1 CREATING YOUR OWN INDEXER
 
 =head2 index_extra()
@@ -159,20 +166,23 @@ the index_extra method as..
 	sub index_extra {
 	
 		my $self = shift;	
-		
-		my $record = $self->_record; # get hash with current record data
+      
+		# get hash with current record data
+      my $record = $self->_record;      
 
-		# record holds 'abs_loc', 'filename', and 'ondisk'
-	
-		if ($record->{filename}=~/\.\w{1,4}$/ ){ # ext will be the distiction between dirs here
+		# by default, record holds 'abs_loc', 'filename', and 'ondisk'
+      
+	   # ext will be the distiction between dirs here
+		if ($record->{filename}=~/\.\w{1,4}$/ ){ 
 				
 				my $m = new File::MMagic;
-				my $mime = $m->checktype_filename( $record->{abs_loc} .'/'. $record->{filename} );
+				my $mime = $m->checktype_filename( 
+               $record->{abs_loc} .'/'. $record->{filename} 
+            );
 				
 				if ($mime){ 
-				
-					$self->_set('mime_type',$mime); # and now we append to the record another key and value
-					
+				   # and now we append to the record another key and value pair
+					$self->_set('mime_type',$mime); 					
 				}		
 		}
 	
@@ -187,8 +197,19 @@ Then in your script
 
 	$i->index('/home/myself');
 
-	# now you can search files by mime type
+	# now you can search files by mime type residing somewhere in that dir
 
+   $i->search({ mime_type => 'mp3' });
+
+   #or 
+   $i->search({ 
+      mime_type => 'mp3',
+      filename => 'u2',
+   });
+
+=head1 SEE ALSO
+
+L<Metadata::ByInode> and L<Metadata::ByInode::Search>
 
 =cut
 
@@ -246,10 +267,11 @@ sub _delete_treeslice {
 
 	return 1;
 }
+=pod
 
 =head1 AUTHOR
 
-Leo Charre
+Leo Charre <leo@leocharre.com>
 
 =cut
 
