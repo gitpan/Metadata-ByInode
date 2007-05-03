@@ -3,9 +3,8 @@ use warnings;
 use strict;
 use Carp;
 use Cwd;
-#use Smart::Comments '###';
 
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.3 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.4 $ =~ /(\d+)/g;
 
 =pod
 

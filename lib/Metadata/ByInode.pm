@@ -8,8 +8,7 @@ use Metadata::ByInode::Search;
 use Metadata::ByInode::Indexer;
 our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
 
-#use Smart::Comments '####', '#####';
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.11 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.12 $ =~ /(\d+)/g;
 
 sub new {
 	my ($class,$self)= (shift,shift);

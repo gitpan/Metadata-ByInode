@@ -2,7 +2,6 @@ use Test::Simple 'no_plan';
 use strict;
 use lib './lib';
 use Metadata::ByInode;
-#use Smart::Comments '###';
 
 my $abs_loc = '/tmp';
 my $filename = time.'mbi.db';

@@ -1,8 +1,7 @@
 package Metadata::ByInode::Search;
 use strict;
 use warnings;
-#use Smart::Comments '###';
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.8 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.9 $ =~ /(\d+)/g;
 
 
 #returns boolean, did a search complete?

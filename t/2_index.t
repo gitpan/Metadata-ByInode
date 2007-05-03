@@ -4,7 +4,6 @@ use lib './lib';
 use Metadata::ByInode;
 use Cwd;
 
-#use Smart::Comments '###';
 
 
 my $m;
