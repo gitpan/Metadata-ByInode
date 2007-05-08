@@ -4,10 +4,10 @@ use strict;
 use Carp;
 use Cwd;
 use File::Find::Rule;
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.7 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.8 $ =~ /(\d+)/g;
 #use Smart::Comments '###';
 
-my $DEBUG =0;
+my $DEBUG =1;
 sub DEBUG : lvalue { $DEBUG }
 
 my $TEST =0;
@@ -61,13 +61,12 @@ sub _teststop {
 }
 
 
+
 sub index {
 	my $self = shift;
 	my $arg = shift; $arg or croak('missing argument to index');
 	my $abs_path = Cwd::abs_path($arg);
 
-	$self->{index_hidden_files} ||=0;
-	
 	# index hidden? follow symlinks?	
 	my $files_indexed = 0;	
 	# make sure if this is a dir, we use mindepth so we do NOT index itself
@@ -77,21 +76,35 @@ sub index {
 	$self->_delete_treeslice($abs_path);
 
 
-	print STDERR " getting list of files.. " if DEBUG;
-	my $files = _find_abs_paths($abs_path);
-	print STDERR "done.\n" if DEBUG;
+	unless ($self->{index_hidden_files}){
+		print STDERR " setting rule for no hidden files.. " if DEBUG;	
+		$self->finder->not_name( qr/^\./ ); # no hidden files	, but will this index a reg file ina  hidden dir?
+		print STDERR "done.\n" if DEBUG;
+	}
+	
+	my @files = $self->finder->in($abs_path);
 
 	if (DEBUG){
-		printf STDERR " we count %s files\n", scalar @$files;
+		printf STDERR " we count %s files\n", scalar @files;
 		printf STDERR " we will stop at %s (DEBUG is on)\n", $self->_teststop;
 	}
 
-	
-	
-	
-	for ( @$files ){  #### Working===[%]     done
 
-		if ( DEBUG or TEST and $self->_teststop == $files_indexed ){ 
+
+	
+	my $runonce_=0;
+	for ( @files ){  #### Working===[%]     done
+		
+		#take out first if it's self and a dir, we do not index ourselves in this case! 
+		unless($runonce_){
+			$runonce_=1;
+			if ($abs_path eq $_ and -d $_){
+				print STDERR " index() took out self.. $_\n" if DEBUG;
+				next;
+			}		
+		}
+		
+		if ( (DEBUG or TEST) and $self->_teststop == $files_indexed ){ 
 			printf STDERR " reached teststop of %s files\n", $self->_teststop;
 			last;
 		}
@@ -99,12 +112,12 @@ sub index {
 		# make sure we do not index the original argument	
 	
 		my $abs_path = $_;
-		$abs_path=~/^(.+)\/([^\/]+$)/ or die;
+		$abs_path=~/^(.+)\/([^\/]+$)/ or die(__PACKAGE__.'115');
 		my ($abs_loc,$filename)=($1,$2);
 
-		unless( $self->{index_hidden_files} ){
-			if ($abs_loc=~/\/\./ or $filename=~/^\./){ next; } # /. anywhere
-		}	
+	#	unless( $self->{index_hidden_files} ){
+	#		if ($abs_loc=~/\/\./ or $filename=~/^\./){ next; } # /. anywhere
+	#	}
 		
 
 		my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
@@ -146,12 +159,14 @@ sub index {
 
 		$self->set($ino,$self->_record); # set first arg can be inode or abs path, this should quicken with passing it inode
 		$files_indexed++;
+
 	}
 			
 	my $seconds_elapsed = int(time - $ondisk);
 	### $seconds_elapsed
 	### $files_indexed
 
+	$self->dbh->commit;
 	
 	return $files_indexed;	
 }
@@ -174,19 +189,15 @@ sub find_abs_paths_systemfind {
 }
 =cut
 
-sub _find_abs_paths {
-	my $abs_path = shift; $abs_path or die('missing arg to find_abs_paths()'); # THIS WILL NOT WORK FOR FILES? only dirs?
-
-	my $rule = new File::Find::Rule; # ->file();
-	$rule->not_name( qr/^\./ ); # no hidden files
-
-	my @files = $rule->in( $abs_path );
-	# take out first entry, which is itself- ONLY if we index dirs too
-	#shift @files;	
-	## $abs_path
-	## @files
-	return \@files;
+sub finder {
+	my $self = shift;
+	unless( defined $self->{file_file_rule} ){
+		$self->{file_find_rule} = new File::Find::Rule();
+		defined $self->{file_find_rule} or die("cant get File::Find::Rule object");		
+	}	
+	return $self->{file_find_rule};
 }
+
 
 
 
@@ -221,6 +232,27 @@ sub index_extra {
 
 =pod
 
+
+
+=head1 USING THE INDEXER
+
+by deafault we just record abs_loc, filename, ontime(timestamp we recorded it on)
+you can use the method rule() which returns a L<File::Find::Rule> object, to do neat things..
+
+	my $i = new Metadata::ByInode({ abs_dbfile => '/tmp/dbfile.db' });
+
+	$i->finder->name( qr/\.mp3$|\.avi$/ );
+
+	$i->index('/home/myself'); 
+
+This would only index mp3 and avi files in your home dir.
+
+=head2 finder()
+
+returns File::Find::Rule object,
+you can feed it rules before calling index()
+
+
 =head1 CREATING YOUR OWN INDEXER
 
 =head2 index_extra()
@@ -237,6 +269,7 @@ the index_extra method as..
 	package Indexer::WithMime;
 	use File::MMagic;		
 	use base 'Metadata::ByInode::Indexer';
+
 	
 	sub index_extra {
 	

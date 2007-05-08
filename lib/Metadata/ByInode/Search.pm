@@ -1,7 +1,7 @@
 package Metadata::ByInode::Search;
 use strict;
 use warnings;
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.10 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.11 $ =~ /(\d+)/g;
 
 
 #returns boolean, did a search complete?
@@ -58,7 +58,7 @@ sub search { # multiple key lookup and ranked
 	 'like'  => $self->dbh->prepare("SELECT * FROM metadata WHERE mkey=? and mvalue LIKE ?"),
 	 'exact' => $self->dbh->prepare("SELECT * FROM metadata WHERE mkey=? and mvalue=?"),
 	};	
-	my $sk = 'like';
+	my $sk = 'like'; #default
 
 	my $RESULT = {};
 
@@ -75,7 +75,7 @@ sub search { # multiple key lookup and ranked
 			$sk ='like'			
 		}
 		
-		$select->{$sk}->execute($key,$value);
+		$select->{$sk}->execute($key,$value) or warn("cannot search? $DBI::errstr");
 
 		while ( my $row = $select->{$sk}->fetch ){
 			$RESULT->{$row->[0]}->{_hit}++;

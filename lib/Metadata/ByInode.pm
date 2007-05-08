@@ -9,7 +9,7 @@ use base 'Metadata::ByInode::Indexer';
 use Benchmark::Timer;
 
 #our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.14 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.15 $ =~ /(\d+)/g;
 my $DEBUG = 0;
 sub DEBUG : lvalue { $DEBUG }
 
@@ -248,7 +248,7 @@ are automatically take out of the metadata database if they are not there any mo
 sub set {
 	### set called
 	my $self = shift;
-	my $arg = shift; $arg or croak('missing abs path or inode argument to set()');	
+	my $arg = shift; $arg or confess('missing abs path or inode argument to set()');	
 	my $hash = shift;
 	$self->timer->start('set')if DEBUG;
 	
@@ -269,7 +269,7 @@ sub set {
 	
 	$self->timer->start('set_executes')if DEBUG;
 	for (keys %{$hash}){
-		$self->{_open_handle}->{replace}->execute($inode,$_,$hash->{$_}) or croak($DBI::errstr);
+		$self->{_open_handle}->{replace}->execute($inode,$_,$hash->{$_}) or confess($DBI::errstr);
 	}	
 	$self->timer->stop('set_executes')if DEBUG;
 	
