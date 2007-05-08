@@ -38,11 +38,14 @@ ok( $m->results_count == 1,'results count, 1 pm file');
 ok( $RESULT = $m->search_results,'search results in array form');
 ### $RESULT
 
+rmdir './t/haha';
 
 ok((mkdir './t/haha'), 'make test dir');
+open(FILE,">./t/haha/hahaha");
+close FILE;
 ok( $m->index(cwd), 're index');
 
-$m->search({ filename => 'haha'});
+$m->search({ filename => 'hahaha'});
 
 ok($m->results_count == 1, 'one file matching');
 
@@ -50,13 +53,15 @@ ok($m->results_count == 1, 'one file matching');
 # NEED TO WAIT FOR INDEXER TO TAKE OUT , to recognize as old.
 sleep 1; # sleeps for 1 sec
 
-ok((rmdir './t/haha'), 'del test dir' );
+ok((unlink './t/haha/hahaha'), 'del test dir' );
 ok( $m->index(cwd), 're index');
 
-my $srch= $m->search({ filename => 'haha'});
+my $srch= $m->search({ filename => 'hahaha'});
 ### $srch
 ok( $m->results_count == 0 , 'no file matching');
 
+
+rmdir './t/haha';
 
 
 unlink './t/mbitest.db';

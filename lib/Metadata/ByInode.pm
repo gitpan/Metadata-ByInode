@@ -4,17 +4,26 @@ use warnings;
 use Carp;
 use DBI;
 use Cwd;
-use Metadata::ByInode::Search;
-use Metadata::ByInode::Indexer;
-our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
+use base 'Metadata::ByInode::Search';
+use base 'Metadata::ByInode::Indexer';
+use Benchmark::Timer;
 
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.12 $ =~ /(\d+)/g;
+#our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.14 $ =~ /(\d+)/g;
+my $DEBUG = 0;
+sub DEBUG : lvalue { $DEBUG }
+
+sub timer {
+	my $self = shift;
+	$self->{timer} ||= new Benchmark::Timer;
+	return $self->{timer};
+}
 
 sub new {
 	my ($class,$self)= (shift,shift);
 	$self||={};
 
-	$self->{abs_dbfile} or $self->{dbh} or croak('no abs_dbfile arg or open dbh arg passed to constructor');
+	$self->{abs_dbfile} or $self->{dbh} or croak('no (abs_dbfile )arg or open (dbh) arg passed to constructor');
 	
 	bless $self, $class;
 
@@ -104,19 +113,36 @@ It returns the number of prepared handles closed.
 
 
 
+sub _reset_db {
+	my $self = shift;
+	print STDERR __PACKAGE__."::_reset_db() called\n" if DEBUG;	
+	
+	unless( $self->dbh->do('DROP TABLE metadata') ) {			
+		my $err =$DBI::errstr;
+		die("cannot setup db, is DBD::SQLite installed? $! - ".$DBI::esstr);
+	}
 
+
+	$self->_setup_db or return 0;
+
+	print STDERR __PACKAGE__."::_reset_db() done\n" if DEBUG;	
+	
+	return 1;
+}
 
 sub _setup_db {
 	my $self = shift;
 	
-	my $b = 'CREATE TABLE IF NOT EXISTS metadata (
+	print STDERR __PACKAGE__."::_setup_db() called\n" if DEBUG;	
+	
+	my $b = qq|CREATE TABLE IF NOT EXISTS metadata(
 inode INTEGER(10) NOT NULL,
-key VARCHAR(50) NOT NULL,
-value TEXT,
-PRIMARY KEY (inode,key)
-);';
+mkey VARCHAR(50) NOT NULL,
+mvalue TEXT,
+PRIMARY KEY (inode,mkey)
+)|;
 
-	unless( $self->{dbh}->do($b) ) {			
+	unless( $self->dbh->do($b) ) {			
 		my $err =$DBI::errstr;
 		die("cannot setup db, is DBD::SQLite installed? $! - ".$DBI::esstr);
 	}
@@ -124,6 +150,8 @@ PRIMARY KEY (inode,key)
 	# must commit here to prevent error that when you search before you index, it fucks up
 
 	$self->dbh->commit;
+
+	print STDERR __PACKAGE__."::_setup_db() done\n" if DEBUG;	
 
 	return 1;
 }
@@ -136,10 +164,17 @@ The table is :
 
 	CREATE TABLE IF NOT EXISTS metadata (
 		inode INTEGER(10) NOT NULL,
-		key VARCHAR(50) NOT NULL,
-		value TEXT,
-		PRIMARY KEY (inode,key)
+		mkey VARCHAR(50) NOT NULL,
+		mvalue TEXT,
+		PRIMARY KEY (inode,mkey)
 	);
+
+in previous version, mkey was 'key', but this caused problems in mysql
+
+
+=head1 _reset_db()
+
+will reset the table, drop and recreate metadata table.
 
 =cut
 
@@ -154,9 +189,10 @@ sub dbh {
 
 	
 	unless( defined $self->{dbh} ){
+		print STDERR __PACKAGE__."::dbh() was not defined.. will set up for sqlite..\n" if DEBUG;		
 		
 		$self->{abs_dbfile} or croak(
-			"need open database handle or absolute path to sqlite databse file "
+			"need open database handle (dbh) or absolute path to sqlite databse file (abs_dbfile) "
 			."as construcctor argument to Metadata::ByInode");
 
 		my $isnew=0;
@@ -174,7 +210,7 @@ sub dbh {
 		else {
 				croak("ERR: [$!], could not connect db[".$self->{abs_dbfile}."] -[$DBI::errstr]-"); 
 		}
-
+				
 		# if it didn't exist before, set up the metadata table.
 		if ($isnew) {
 			$self->_setup_db;
@@ -182,6 +218,7 @@ sub dbh {
 	}	
 	return $self->{dbh};
 }
+
 =pod
 
 =head1 dbh()
@@ -213,20 +250,30 @@ sub set {
 	my $self = shift;
 	my $arg = shift; $arg or croak('missing abs path or inode argument to set()');	
 	my $hash = shift;
+	$self->timer->start('set')if DEBUG;
 	
-	### $arg
+	$self->timer->start('set_getinode')if DEBUG;
 	my $inode = _get_inode($arg);
-	### $inode
+	$self->timer->stop('set_getinode') if DEBUG;
 	
 	# init replace query
-	unless( defined $self->{_open_hadle}->{replace} ){
+	unless( defined $self->{_open_handle}->{replace} ){
+		$self->timer->start('set_initq')if DEBUG;
+	
 		$self->{_open_handle}->{replace} = 
-			$self->dbh->prepare('REPLACE INTO metadata (inode,key,value) VALUES(?,?,?)');
+			$self->dbh->prepare('REPLACE INTO metadata (inode,mkey,mvalue) VALUES(?,?,?)');
+			#$self->dbh->prepare('INSERT INTO metadata (inode,mkey,mvalue) VALUES(?,?,?)');
+			
+		$self->timer->stop('set_initq')if DEBUG;			
 	}
-
+	
+	$self->timer->start('set_executes')if DEBUG;
 	for (keys %{$hash}){
 		$self->{_open_handle}->{replace}->execute($inode,$_,$hash->{$_}) or croak($DBI::errstr);
 	}	
+	$self->timer->stop('set_executes')if DEBUG;
+	
+	$self->timer->stop('set')if DEBUG;
 
 	return 1;
 }
@@ -259,7 +306,7 @@ sub get {
 	
 	unless( defined $self->{_open_handle}->{select_by_key} ){
 		$self->{_open_handle}->{select_by_key} = 
-			$self->dbh->prepare('SELECT value FROM metadata WHERE inode=? AND key=?');		
+			$self->dbh->prepare('SELECT mvalue FROM metadata WHERE inode=? AND mkey=?');		
 	}	
 	
 	$self->{_open_handle}->{select_by_key}->execute($inode, $key);
@@ -294,7 +341,7 @@ sub get_all {
 	# init select query
 	unless( defined $self->{_open_handle}->{select_all} ){
 		$self->{_open_handle}->{select_all} = 
-			$self->dbh->prepare('SELECT key,value FROM metadata WHERE inode = ?');
+			$self->dbh->prepare('SELECT mkey,mvalue FROM metadata WHERE inode = ?');
 	}
 	
 
@@ -370,8 +417,8 @@ sub _search_inode {
 	unless( defined $self->{_open_handle}->{f} ){
 		$self->{_open_handle}->{f} = 
 			$self->dbh->prepare(q{
-SELECT inode FROM metadata WHERE key='abs_loc' AND value=? and inode=
- (SELECT inode FROM metadata WHERE key='filename' AND value=?);
+SELECT inode FROM metadata WHERE mkey='abs_loc' AND mvalue=? and inode=
+ (SELECT inode FROM metadata WHERE mkey='filename' AND mvalue=?);
 });
 
 	}
@@ -448,9 +495,6 @@ sub _finish_open_handles {
 			$self->{_commit}++;
 		}	
 	 }
-
-
-
 	return $self->{_commit};
 }
 
@@ -459,7 +503,7 @@ sub DESTROY {
 
 	# we only do these when the db was opened from this object. Otherwise it's their business.
 	
-	if (defined $self->{dbh} and defined $self->{_not_passed_as_argument}   ){
+	if ( defined $self->{dbh} and defined $self->{_not_passed_as_argument} ){
 		# TODO : what if they still want the handle!!!!!?????
 		# if the dbhandle was created here, then close it. otherwise, nothing.
 		# seems like a compromise.
@@ -468,14 +512,21 @@ sub DESTROY {
 				
 		}
 		
-		 # get rid of annoying waring
+		 # get rid of annoying warning
 		open (STDERR,">>/dev/null");
 
 		$self->dbh->disconnect; # TODO : warns that 'closing dbh with active statement handles at lib/Metadata/ByInode.pm'
 		# WHY does it warn???
-		close STDERR;
+		close STDERR;		
+	}
+
+
+	if (DEBUG){
+		print STDERR "======== reports.. ====\n";
+		print STDERR $self->timer->reports;	
 	}
 }
+
 1;
 
 =pod

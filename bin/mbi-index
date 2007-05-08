@@ -10,7 +10,7 @@ use CGI::Ex::Conf 'conf_read';
 use Smart::Comments '###';
 
 my $o = {};
-getopts('l:d:m',$o);
+getopts('rl:d:m',$o);
 
 $o->{l} ||= cwd;
 $o->{d} ||= abs_dbfile_from_conf();
@@ -18,6 +18,13 @@ $o->{m} ||=0;
 
 
 my $m = new Metadata::ByInode({abs_dbfile => $o->{d} });
+
+if ($o->{r}){
+	$m->_reset_db;
+	exit;
+}
+
+
 
 my $index_start = `date`;
 my $files_indexed = $m->index($o->{l},{ mime_type => $o->{m} });
@@ -64,6 +71,10 @@ location, if not provided, will use pwd
 =item -m
 
 boolean, if we should index mime type
+
+=item -r
+
+reset db table, drops 'metadata' table and recreates
 
 =back
 
