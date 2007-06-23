@@ -6,18 +6,12 @@ use DBI;
 use Cwd;
 use base 'Metadata::ByInode::Search';
 use base 'Metadata::ByInode::Indexer';
-use Benchmark::Timer;
 
 #our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.15 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.16 $ =~ /(\d+)/g;
 my $DEBUG = 0;
 sub DEBUG : lvalue { $DEBUG }
 
-sub timer {
-	my $self = shift;
-	$self->{timer} ||= new Benchmark::Timer;
-	return $self->{timer};
-}
 
 sub new {
 	my ($class,$self)= (shift,shift);
@@ -250,30 +244,22 @@ sub set {
 	my $self = shift;
 	my $arg = shift; $arg or confess('missing abs path or inode argument to set()');	
 	my $hash = shift;
-	$self->timer->start('set')if DEBUG;
 	
-	$self->timer->start('set_getinode')if DEBUG;
 	my $inode = _get_inode($arg);
-	$self->timer->stop('set_getinode') if DEBUG;
 	
 	# init replace query
 	unless( defined $self->{_open_handle}->{replace} ){
-		$self->timer->start('set_initq')if DEBUG;
 	
 		$self->{_open_handle}->{replace} = 
 			$self->dbh->prepare('REPLACE INTO metadata (inode,mkey,mvalue) VALUES(?,?,?)');
 			#$self->dbh->prepare('INSERT INTO metadata (inode,mkey,mvalue) VALUES(?,?,?)');
 			
-		$self->timer->stop('set_initq')if DEBUG;			
 	}
 	
-	$self->timer->start('set_executes')if DEBUG;
 	for (keys %{$hash}){
 		$self->{_open_handle}->{replace}->execute($inode,$_,$hash->{$_}) or confess($DBI::errstr);
 	}	
-	$self->timer->stop('set_executes')if DEBUG;
 	
-	$self->timer->stop('set')if DEBUG;
 
 	return 1;
 }
@@ -521,10 +507,6 @@ sub DESTROY {
 	}
 
 
-	if (DEBUG){
-		print STDERR "======== reports.. ====\n";
-		print STDERR $self->timer->reports;	
-	}
 }
 
 1;
