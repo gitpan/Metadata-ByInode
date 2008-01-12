@@ -7,8 +7,9 @@ use Cwd;
 use base 'Metadata::ByInode::Search';
 use base 'Metadata::ByInode::Indexer';
 
+
 #our @ISA = qw(Metadata::ByInode::Search Metadata::ByInode::Indexer);
-our $VERSION = sprintf "%d.%02d", q$Revision: 1.16 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%02d", q$Revision: 1.17 $ =~ /(\d+)/g;
 my $DEBUG = 0;
 sub DEBUG : lvalue { $DEBUG }
 

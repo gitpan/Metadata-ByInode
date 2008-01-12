@@ -18,7 +18,7 @@ ok( $indexed_run1, "index run 1: $indexed_run1");
 
 my $RESULT;
 ok( $RESULT = $m->search({'filename:exact' => 'file2.x', abs_loc=> $abs_index }),'search exact one key');
-ok( $m->results_count == 1 );
+ok( $m->results_count == 1, "Results count should be 1, it is ".$m->results_count );
 
 
 ok( $RESULT = $m->search({'filename:like' => 'pm', abs_loc=> $abs_index }),'search one key');

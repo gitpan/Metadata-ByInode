@@ -12,4 +12,8 @@ t/misc/Coop.pm
 t/misc/indexme.pm
 t/misc/indexme2.pm
 t/misc/Index.one
+t/misc/file2.x
+t/misc/file2.txt
+t/misc/file1.txt
+t/misc/ffile2.x
 META.yml                                 Module meta-data (added by MakeMaker)
